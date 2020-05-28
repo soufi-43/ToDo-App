@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:todoapp/todo/newtodo.dart';
+import 'utilities.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -8,6 +9,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -32,8 +37,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Padding(
       padding: EdgeInsets.all(24),
       child: StreamBuilder(
-        stream: Firestore.instance.collection('todos').snapshots(),
-
+        stream: Firestore.instance.collection(collections['todos']).orderBy('done').snapshots(),
+        // ignore: missing_return
         builder: (BuildContext context, AsyncSnapshot snapshot) {
           switch (snapshot.connectionState) {
             case ConnectionState.none:
@@ -41,17 +46,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
               break;
             case ConnectionState.waiting:
-            return Center(child: CircularProgressIndicator(),);
+              return Center(
+                child: CircularProgressIndicator(),
+              );
               break;
             case ConnectionState.active:
             case ConnectionState.done:
-              if(snapshot.hasError){
+              if (snapshot.hasError) {
                 return _error(context, snapshot.error.toString());
-
               }
-              if(!snapshot.hasData){
+              if (!snapshot.hasData) {
                 return _error(context, 'No Data');
-
               }
 
               // ignore: missing_return
@@ -76,11 +81,44 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _drawScreen(BuildContext context, QuerySnapshot data) {
     return ListView.builder(
         itemCount: data.documents.length,
-        itemBuilder:(BuildContext context,int position){
-          return ListTile(
-            title: Text(data.documents[position]['body']),
+        itemBuilder: (BuildContext context, int position) {
+          return Card(
+            child: ListTile(
+              title: Text(
+                data.documents[position]['body'],
+                style: TextStyle(
+                  decoration: data.documents[position]['done']
+                      ? TextDecoration.lineThrough
+                      : TextDecoration.none,
+                ),
+              ),
+              trailing: IconButton(
+                onPressed: () {
+                  Firestore.instance.collection(collections['todos']).document(data.documents[position].documentID).delete() ;
+                },
+                icon: Icon(
+                  Icons.delete,
+                  color: Colors.red.shade300,
+                ),
+              ),
+              leading: IconButton(
+                onPressed: () {
+                  Firestore.instance
+                      .collection(collections['todos'])
+                      .document(data.documents[position].documentID)
+                      .updateData({
+                    'done': true,
+                  });
+                },
+                icon: Icon(
+                  Icons.assignment_turned_in,
+                  color: data.documents[position]['done']
+                      ? Colors.teal
+                      : Colors.grey.shade300,
+                ),
+              ),
+            ),
           );
         });
-
   }
 }

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'utilities.dart';
 
 class NewToDo extends StatefulWidget {
   @override
@@ -77,7 +78,7 @@ class _NewToDoState extends State<NewToDo> {
         _isLoading = true;
       });
       FirebaseAuth.instance.currentUser().then((user){
-       Firestore.instance.collection('todos').document().setData({
+       Firestore.instance.collection(collections['todos']).document().setData({
          'body':_todoController.text ,
          'user_id':user.uid,
          'done':false,
