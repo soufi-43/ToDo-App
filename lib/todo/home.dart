@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:todoapp/auth/login.dart';
 import 'package:todoapp/todo/newtodo.dart';
 import 'utilities.dart';
 
@@ -9,22 +11,78 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  FirebaseUser _user;
+
+  bool _hasError = false;
+
+  bool _isLoading = true;
+
+  String _errorMessage;
+
+  String _name ;
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    FirebaseAuth.instance.currentUser().then((user) {
 
 
 
+      Firestore.instance.collection('profiles').where('user_id',isEqualTo: user.uid).getDocuments().then((snapshotQuery){
+
+
+        setState(() {
+          _name = snapshotQuery.documents[0]['name'];
+
+          _user = user;
+          _isLoading = false;
+          _hasError = false;
+        });
+
+      });
+
+
+
+
+    }).catchError((error) {
+      setState(() {
+        _hasError = true;
+        _errorMessage = error.toString();
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: Text('Home'),
+        title: _isLoading ?Text('Home') : (_hasError ? _error(context, _errorMessage):Text(_name))  ,
+      ),
+      drawer: Drawer(
+        child: ListView(
+          children: <Widget>[
+            ListTile(
+              title: Text('LOGOUT'),
+              trailing: Icon(Icons.exit_to_app),
+              onTap: () async {
+                FirebaseAuth.instance.signOut().then((_) {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pushReplacement(MaterialPageRoute(
+                    builder: (context) => LoginScreen(),
+                  ));
+                });
+              },
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _newToDo,
         child: Icon(Icons.add),
       ),
-      body: _content(context),
+      body: _conTent(context),
     );
   }
 
@@ -33,39 +91,55 @@ class _HomeScreenState extends State<HomeScreen> {
         .push(MaterialPageRoute(builder: (context) => NewToDo()));
   }
 
-  Widget _content(BuildContext context) {
+  Widget _conTent(BuildContext context) {
     return Padding(
       padding: EdgeInsets.all(24),
-      child: StreamBuilder(
-        stream: Firestore.instance.collection(collections['todos']).orderBy('done').snapshots(),
-        // ignore: missing_return
-        builder: (BuildContext context, AsyncSnapshot snapshot) {
-          switch (snapshot.connectionState) {
-            case ConnectionState.none:
-              return _error(context, 'No connectionis made');
+      child: _isLoading
+          ? loading(context)
+          : (_hasError ? _error(context, _errorMessage) : content(context)),
+    );
+  }
 
-              break;
-            case ConnectionState.waiting:
-              return Center(
-                child: CircularProgressIndicator(),
-              );
-              break;
-            case ConnectionState.active:
-            case ConnectionState.done:
-              if (snapshot.hasError) {
-                return _error(context, snapshot.error.toString());
-              }
-              if (!snapshot.hasData) {
-                return _error(context, 'No Data');
-              }
+  Widget content(BuildContext context) {
+    return StreamBuilder(
+      stream: Firestore.instance
+          .collection(collections['todos'])
+          .where('user_id', isEqualTo: _user.uid)
+          .orderBy('done')
+          .snapshots(),
+      // ignore: missing_return
+      builder: (BuildContext context, AsyncSnapshot snapshot) {
+        switch (snapshot.connectionState) {
+          case ConnectionState.none:
+            return _error(context, 'No connection is made');
 
-              // ignore: missing_return
-              return _drawScreen(context, snapshot.data);
+            break;
+          case ConnectionState.waiting:
+            return Center(
+              child: CircularProgressIndicator(),
+            );
+            break;
+          case ConnectionState.active:
+          case ConnectionState.done:
+            if (snapshot.hasError) {
+              return _error(context, snapshot.error.toString());
+            }
+            if (!snapshot.hasData) {
+              return _error(context, 'No Data');
+            }
 
-              break;
-          }
-        },
-      ),
+            // ignore: missing_return
+            return _drawScreen(context, snapshot.data);
+
+            break;
+        }
+      },
+    );
+  }
+
+  Widget loading(BuildContext context) {
+    return Center(
+      child: CircularProgressIndicator(),
     );
   }
 
@@ -94,7 +168,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               trailing: IconButton(
                 onPressed: () {
-                  Firestore.instance.collection(collections['todos']).document(data.documents[position].documentID).delete() ;
+                  Firestore.instance
+                      .collection(collections['todos'])
+                      .document(data.documents[position].documentID)
+                      .delete();
                 },
                 icon: Icon(
                   Icons.delete,

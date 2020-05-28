@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   TextEditingController _emailController = TextEditingController();
   TextEditingController _passwordController = TextEditingController();
   TextEditingController _confirmPasswordController = TextEditingController();
+  TextEditingController _nameController = TextEditingController();
   bool _autoValidation = false;
   String _error;
 
@@ -25,6 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -55,6 +58,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 validator: (value) {
                   if (value.isEmpty) {
                     return 'Email is Required';
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(
+                height: 24,
+              ),
+              TextFormField(
+                controller: _nameController,
+                decoration: InputDecoration(hintText: 'Name'),
+                validator: (value) {
+                  if (value.isEmpty) {
+                    return 'Name is Required';
                   }
                   return null;
                 },
@@ -140,22 +156,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _autoValidation = false;
       });
 
-      AuthResult result = await FirebaseAuth.instance
+      FirebaseAuth.instance
           .createUserWithEmailAndPassword(
-              email: _emailController.text, password: _passwordController.text);
-
-      if (result.user == null) {
-        setState(() {
-          _isLoading = false ;
-          _error = 'User registration error';
+              email: _emailController.text, password: _passwordController.text)
+          .then((authResult) {
+        Firestore.instance.collection('profiles').document().setData({
+          'name': _nameController.text,
+          'user_id': authResult.user.uid,
+        }).then((_) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(),
+            ),
+          );
+        }).catchError((error) {
+          setState(() {
+            _isLoading = false;
+            _error = error.toString();
+          });
         });
-      } else {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => HomeScreen(),
-          ),
-        );
-      }
+      }).catchError((error) {
+        setState(() {
+          _isLoading = false;
+          _error = error.toString();
+        });
+      });
     }
   }
 
